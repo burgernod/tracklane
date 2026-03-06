@@ -164,7 +164,9 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           {isProjectsExpanded && (
-            <TouchableOpacity style={styles.projectCard}>
+            <TouchableOpacity 
+                style={styles.projectCard}
+                onPress={() => router.push('/project-workspace')}>
                <View style={styles.projectCardLeft}>
                   <Image 
                                   source={require('../../assets/images/tracklane-logo-circle.svg')} 

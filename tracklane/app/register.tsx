@@ -1,13 +1,16 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ScrollView, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ScrollView, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  
+  // Состояние для управления видимостью модального окна
+  const [isTermsVisible, setIsTermsVisible] = useState(false);
 
   const handleTermsPress = () => {
-    Alert.alert('Условия и Политика', 'Здесь должен открываться текст условий и политики конфиденциальности.');
+    setIsTermsVisible(true);
   };
 
   return (
@@ -62,6 +65,80 @@ export default function RegisterScreen() {
         </TouchableOpacity>
 
       </ScrollView>
+
+      {/* Модальное окно с текстом Условий и Политики */}
+      <Modal
+        visible={isTermsVisible}
+        animationType="slide"
+        presentationStyle="pageSheet" // На iOS окно откроется как красивая карточка (BottomSheet), на Android как обычный экран
+        onRequestClose={() => setIsTermsVisible(false)} // Для кнопки "Назад" на Android
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          {/* Шапка модального окна */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Условия и Политика</Text>
+            <TouchableOpacity onPress={() => setIsTermsVisible(false)} style={styles.closeBtn}>
+              <Ionicons name="close" size={24} color="#1A1A1A" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Контент Политики */}
+          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
+            
+            <Text style={styles.termsSectionTitle}>Введение</Text>
+            <Text style={styles.termsParagraph}>
+              Добро пожаловать в TrackLane! Настоящий документ определяет условия использования нашего мобильного приложения и описывает, как мы собираем, используем и защищаем вашу личную информацию. Создавая аккаунт в TrackLane, вы соглашаетесь с данными условиями.
+            </Text>
+
+            <Text style={styles.termsSectionTitle}>1. Сбор данных</Text>
+            <Text style={styles.termsParagraph}>Для обеспечения корректной работы сервиса мы собираем следующие данные:</Text>
+            <Text style={styles.termsBullet}>• Личная информация, предоставляемая при регистрации: имя, фамилия, псевдоним, адрес электронной почты.</Text>
+            <Text style={styles.termsBullet}>• Данные, создаваемые в процессе использования приложения: названия проектов, задачи, комментарии, загруженные изображения и файлы.</Text>
+            <Text style={styles.termsBullet}>• Технические данные: информация об устройстве, IP-адрес, логи сбоев приложения.</Text>
+
+            <Text style={styles.termsSectionTitle}>2. Использование данных</Text>
+            <Text style={styles.termsParagraph}>Собранные данные используются исключительно для:</Text>
+            <Text style={styles.termsBullet}>• Создания и управления вашим аккаунтом.</Text>
+            <Text style={styles.termsBullet}>• Предоставления функционала управления проектов (Канбан-доски, комментарии, приглашение участников).</Text>
+            <Text style={styles.termsBullet}>• Отправки системных уведомлений (например, OTP-кодов для подтверждения почты или сброса пароля).</Text>
+            <Text style={styles.termsBullet}>• Улучшения качества нашего сервиса и устранения технических ошибок.</Text>
+
+            <Text style={styles.termsSectionTitle}>3. Хранение и безопасность данных</Text>
+            <Text style={styles.termsParagraph}>
+              Ваша безопасность — наш приоритет. Все текстовые данные и учетные записи хранятся на защищенных серверах (PostgreSQL), а медиафайлы — в надежных облачных хранилищах (Firebase). Мы используем современные методы шифрования для защиты ваших паролей и личной информации от несанкционированного доступа.
+            </Text>
+
+            <Text style={styles.termsSectionTitle}>4. Передача данных третьим лицам</Text>
+            <Text style={styles.termsParagraph}>
+              Мы не продаем и не передаем ваши личные данные третьим лицам для маркетинговых целей. Доступ к вашим данным (именам, задачам) имеют только те пользователи TrackLane, которых вы лично пригласили в свой проект (в роли Admins, Reviewers или Members).
+            </Text>
+
+            <Text style={styles.termsSectionTitle}>5. Ваши права</Text>
+            <Text style={styles.termsParagraph}>Вы имеете полное право:</Text>
+            <Text style={styles.termsBullet}>• Просматривать, изменять или удалять свои личные данные через раздел "Профиль".</Text>
+            <Text style={styles.termsBullet}>• Запросить полное удаление вашего аккаунта и всех связанных с ним проектов и задач из нашей системы.</Text>
+            <Text style={styles.termsBullet}>• Отказаться от получения рассылок (кроме критически важных системных уведомлений).</Text>
+
+            <Text style={styles.termsSectionTitle}>6. Изменения в Политике</Text>
+            <Text style={styles.termsParagraph}>
+              Мы оставляем за собой право периодически обновлять данную Политику конфиденциальности. В случае существенных изменений мы уведомим вас через интерфейс приложения TrackLane или по электронной почте.
+            </Text>
+
+            <Text style={styles.termsSectionTitle}>7. Контакты</Text>
+            <Text style={styles.termsParagraph}>
+              Если у вас возникли вопросы по поводу настоящих Условий или обработки ваших данных, пожалуйста, свяжитесь с нашей службой поддержки: support@tracklane.app
+            </Text>
+
+            <Text style={[styles.termsParagraph, { marginTop: 20, fontStyle: 'italic', color: '#A0A0A0' }]}>
+              Последнее обновление: Март 2024 года.
+            </Text>
+
+            {/* Отступ снизу для комфортного скроллинга */}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -78,7 +155,20 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#E0E0E0', marginVertical: 20 },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 30, paddingRight: 20 },
   checkboxText: { marginLeft: 10, fontSize: 10, color: '#666', lineHeight: 14 },
-  linkText: { color: '#4169E1', textDecorationLine: 'underline' }, // Подчеркивание опционально
+  linkText: { color: '#4169E1', textDecorationLine: 'underline' },
   primaryBtn: { backgroundColor: '#4169E1', paddingVertical: 18, borderRadius: 30, alignItems: 'center', marginBottom: 30 },
   primaryBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+
+  // Стили для модального окна
+  modalContainer: { flex: 1, backgroundColor: '#FFF' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#1A1A1A' },
+  closeBtn: { padding: 5, backgroundColor: '#FAFAFA', borderRadius: 20 },
+  modalScroll: { flex: 1 },
+  modalContent: { padding: 20 },
+  
+  // Стили форматирования текста
+  termsSectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1A1A1A', marginTop: 25, marginBottom: 10 },
+  termsParagraph: { fontSize: 14, color: '#666', lineHeight: 22, marginBottom: 10 },
+  termsBullet: { fontSize: 14, color: '#666', lineHeight: 22, marginBottom: 5, paddingLeft: 10 },
 });

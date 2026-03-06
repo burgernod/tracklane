@@ -56,9 +56,11 @@ export default function TaskScreen() {
           </Text>
 
           {/* Картинка (заглушка) */}
-          <View style={styles.imagePlaceholder}>
-            <Ionicons name="camera-outline" size={40} color="#A0A0A0" />
-          </View>
+          <Image 
+            source={require('../../assets/images/stock-image1.png')} 
+            style={styles.taskImage}
+            contentFit="cover" // cover гарантирует, что изображение красиво заполнит блок
+          />
 
           {/* Комментарии */}
           <View style={[styles.sectionRow, { marginTop: 30, marginBottom: 15 }]}>
@@ -107,7 +109,7 @@ const styles = StyleSheet.create({
   avatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: '#FFF' },
   
   description: { fontSize: 14, color: '#666', lineHeight: 22, marginBottom: 20 },
-  imagePlaceholder: { height: 180, backgroundColor: '#E0E0E0', borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  taskImage: { width: '100%', height: 180, borderRadius: 20, marginBottom: 20 },
 
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   addBtn: { backgroundColor: '#4169E1', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
