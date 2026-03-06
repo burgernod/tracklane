@@ -1,2 +1,50 @@
-# tracklane
-Project of mobile app for kanban and task management within a team
+# 🚀 TrackLane - Mobile Project Management App
+
+**TrackLane** — это современная мобильная система управления проектами и задачами, созданная для эффективной работы команд. Вдохновлена лучшими решениями на рынке (Jira, Asana), но предлагает более чистый, строгий и интуитивно понятный мобильный интерфейс.
+
+![TrackLane Preview](https://via.placeholder.com/800x400.png?text=TrackLane+App+Preview) <!-- Замените ссылку на реальный баннер или скриншоты вашего приложения -->
+
+## 📱 О проекте
+
+Приложение разработано с упором на современный UI/UX: строгие цвета (Black, Royal Blue, White, Light Gray), скругленные формы элементов (borderRadius 20-30) и удобная навигация. Поддерживает полный цикл ведения проектов: от создания доски Kanban до детального обсуждения конкретной задачи.
+
+### ✨ Основной функционал
+- **🔐 Авторизация и безопасность:** Регистрация по Email с подтверждением через OTP-код.
+- **📊 Интерактивный Дешборд:** Сводка по всем задачам с цветными бейджами статусов, недавняя активность и предстоящие дедлайны.
+- **🗂 Управление проектами:** Просмотр списка проектов и детальный Project Workspace с Канбан-доской.
+- **📋 Обзор задач:** Детальная страница задачи с описанием, прикрепленными файлами (изображениями) и секцией комментариев.
+- **👥 Управление командой:** Разделение ролей в проекте (Admins, Reviewers, Members).
+- **📤 Экспорт:** Возможность поделиться списком текущих задач (JSON-экспорт через нативный Share API).
+
+## 🛠 Технологический стек
+
+**Frontend (Мобильное приложение):**
+- [React Native](https://reactnative.dev/)
+- [Expo](https://expo.dev/) (с использованием [Expo Router](https://docs.expo.dev/router/introduction/) для file-based навигации)
+- TypeScript
+- Стилизация: Встроенный `StyleSheet` (Flexbox)
+- Иконки: `@expo/vector-icons`, SVG через `expo-image`
+
+**Backend & База данных (в разработке):**
+- Python (FastAPI / Django)
+- PostgreSQL
+- Firebase (хранение медиафайлов)
+
+## 📂 Архитектура навигации (Expo Router)
+
+Проект разделен на два контура:
+* **Внешний контур (Stack):** `Onboarding`, `Login`, `Register`, `Confirm Email (OTP)`, `Forgot Password`.
+* **Внутренний контур (Drawer):** 
+  * `Dashboard` (Главная)
+  * `Projects` (Проекты)
+  * `Project Workspace` (Канбан-доска)
+  * `Task` (Экран задачи)
+  * `Team` (Команда)
+  * `Profile` (Настройки профиля)
+
+## 🚀 Запуск проекта локально
+
+1. Клонируйте репозиторий:
+   ```bash
+   git clone https://github.com/your-username/tracklane.git
+   cd tracklane
