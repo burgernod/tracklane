@@ -1,10 +1,48 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRequestCode = async () => {
+  if (!email || !email.includes('@')) {
+    Alert.alert("Ошибка", "Введите корректный Email");
+    return;
+  }
+
+  setLoading(true);
+  try {
+      const response = await fetch(`${API_URL}/api/v1/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.toLowerCase().trim() })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert("Успех", "Код восстановления отправлен на вашу почту");
+        // 2. Переходим на экран сброса и передаем email
+        router.push({ 
+          pathname: '/reset-password', 
+          params: { email: email.toLowerCase().trim() } 
+        });
+      } else {
+        Alert.alert("Ошибка", data.detail || "Не удалось отправить код");
+      }
+    } catch (error) {
+      Alert.alert("Ошибка сети", "Не удалось подключиться к серверу");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -19,16 +57,32 @@ export default function ForgotPasswordScreen() {
 
         <Text style={styles.title}>Введите свой Email</Text>
         <Text style={styles.subtitle}>
-          Равным образом постоянный количественный рост и сфера нашей активности представляет собой интересный эксперимент.
+          Мы отправим 6-значный код подтверждения на вашу почту для смены пароля.
         </Text>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Email</Text>
-          <TextInput style={styles.input} placeholder="johnjohnson88@gmail.com" placeholderTextColor="#A0A0A0" />
+          <TextInput 
+            style={styles.input} 
+            placeholder="example@mail.com" 
+            placeholderTextColor="#A0A0A0"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
         </View>
 
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/login')}>
-          <Text style={styles.primaryBtnText}>Выслать код</Text>
+        <TouchableOpacity 
+          style={[styles.primaryBtn, loading && { opacity: 0.7 }]} 
+          onPress={handleRequestCode}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.primaryBtnText}>Выслать код</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

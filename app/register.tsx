@@ -1,13 +1,77 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ScrollView, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ScrollView, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function RegisterScreen() {
   const router = useRouter();
   
   // Состояние для управления видимостью модального окна
   const [isTermsVisible, setIsTermsVisible] = useState(false);
+
+   // 1. Состояния для всех полей ввода
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Состояние для галочки "Условия и политика"
+  const [isTermsAccepted, setIsTermsAccepted] = useState(false);
+
+  const handleRegister = async () => {
+    // Валидация
+    if (!firstName || !lastName || !username || !email || !password) {
+      Alert.alert("Ошибка", "Пожалуйста, заполните все поля");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("Ошибка", "Пароли не совпадают!");
+      return;
+    }
+    if (!isTermsAccepted) {
+      Alert.alert("Внимание", "Вы должны принять условия политики конфиденциальности");
+      return;
+    }
+
+    try {
+      // Отправляем POST запрос
+      const response = await fetch(`${API_URL}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+          username: username,
+          email: email,
+          password: password,
+        })
+      });
+
+      // Пытаемся распарсить ответ
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        Alert.alert("Ошибка сервера", "Бэкенд недоступен или еще не обновился на Render.");
+        return;
+      }
+
+      if (response.ok) {
+        Alert.alert("Успех!", data.message);
+        router.push({ pathname: '/confirm-email', params: { email: email } }); // Переходим на экран OTP кода
+      } else {
+        // Ошибка с бэкенда (например: Email уже занят)
+        Alert.alert("Ошибка", data.detail || "Что-то пошло не так");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Ошибка сети", "Не удалось подключиться к серверу");
+    }
+  };
 
   const handleTermsPress = () => {
     setIsTermsVisible(true);
@@ -26,41 +90,54 @@ export default function RegisterScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         
         {/* Инпуты */}
-        {['Имя', 'Фамилия', 'Псевдоним', 'Email'].map((field, idx) => (
-          <View key={idx} style={styles.inputContainer}>
-            <Text style={styles.label}>{field}</Text>
-            <TextInput style={styles.input} placeholder={field} placeholderTextColor="#A0A0A0" />
-          </View>
-        ))}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Имя</Text>
+          <TextInput style={styles.input} placeholder="Имя" placeholderTextColor="#A0A0A0" value={firstName} onChangeText={setFirstName} />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Фамилия</Text>
+          <TextInput style={styles.input} placeholder="Фамилия" placeholderTextColor="#A0A0A0" value={lastName} onChangeText={setLastName} />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Псевдоним</Text>
+          <TextInput style={styles.input} placeholder="Псевдоним" placeholderTextColor="#A0A0A0" value={username} onChangeText={setUsername} autoCapitalize="none" />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#A0A0A0" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+        </View>
 
         <View style={styles.divider} />
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Пароль</Text>
           <View style={styles.passwordBox}>
-             <TextInput style={{flex: 1}} placeholder="длиной в 8 символов" secureTextEntry placeholderTextColor="#A0A0A0" />
+             <TextInput style={{flex: 1}} placeholder="Минимум 8 символов" secureTextEntry placeholderTextColor="#A0A0A0" value={password} onChangeText={setPassword} />
              <Ionicons name="eye-outline" size={20} color="#A0A0A0" />
           </View>
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Подтверждение пароля</Text>
-          <TextInput style={styles.input} placeholder="повторной ввод пароля" secureTextEntry placeholderTextColor="#A0A0A0" />
+          <TextInput style={styles.input} placeholder="Повторный ввод пароля" secureTextEntry placeholderTextColor="#A0A0A0" value={confirmPassword} onChangeText={setConfirmPassword} />
         </View>
 
-        {/* Кликабельный текст политики */}
-        <View style={styles.checkboxRow}>
-          <Ionicons name="checkmark-circle" size={20} color="#E0E0E0" />
+        {/* Кликабельный текст политики с чекбоксом */}
+        <TouchableOpacity style={styles.checkboxRow} activeOpacity={0.7} onPress={() => setIsTermsAccepted(!isTermsAccepted)}>
+          <Ionicons name="checkmark-circle" size={20} color={isTermsAccepted ? "#4169E1" : "#E0E0E0"} />
           <Text style={styles.checkboxText}>
             Я принимаю{' '}
-            <Text style={styles.linkText} onPress={handleTermsPress}>
+            <Text style={styles.linkText} onPress={() => setIsTermsVisible(true)}>
               Условия и Политику Конфиденциальности
             </Text>
           </Text>
-        </View>
+        </TouchableOpacity>
 
-        {/* Переход на Подтверждение Email */}
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/confirm-email')}>
+        {/* Кнопка регистрации */}
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister}>
           <Text style={styles.primaryBtnText}>Зарегистрироваться</Text>
         </TouchableOpacity>
 
