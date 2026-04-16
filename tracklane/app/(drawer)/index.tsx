@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, {useMemo, useState} from 'react';
 import {
     View,
     Text,
@@ -10,15 +10,18 @@ import {
     Modal,
     Pressable,
 } from 'react-native';
-import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from 'expo-router';
-import { DrawerActions } from '@react-navigation/native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {Ionicons, Feather, MaterialCommunityIcons} from '@expo/vector-icons';
+import {useNavigation} from 'expo-router';
+import {DrawerActions} from '@react-navigation/native';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {
     DraxProvider,
     DraxView,
     DraxScrollView,
 } from 'react-native-drax';
+import DateTimePicker, {
+    DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 
 type TaskStatus = 'process' | 'review' | 'done';
 type TaskPriority = 'low' | 'medium' | 'high';
@@ -41,22 +44,31 @@ interface ActivityItem {
 }
 
 const STATUS_META: Record<TaskStatus, { title: string; color: string }> = {
-    process: { title: 'В процессе', color: '#4169E1' },
-    review: { title: 'На рассмотрении', color: '#FACC15' },
-    done: { title: 'Закончены', color: '#22C55E' },
+    process: {title: 'В процессе', color: '#4169E1'},
+    review: {title: 'На рассмотрении', color: '#FACC15'},
+    done: {title: 'Закончены', color: '#22C55E'},
 };
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
-    low: { label: 'Низкий', color: '#94A3B8' },
-    medium: { label: 'Средний', color: '#F59E0B' },
-    high: { label: 'Высокий', color: '#EF4444' },
+    low: {label: 'Низкий', color: '#94A3B8'},
+    medium: {label: 'Средний', color: '#F59E0B'},
+    high: {label: 'Высокий', color: '#EF4444'},
 };
 
 const FILTER_OPTIONS: Array<{ key: 'all' | TaskStatus; label: string }> = [
-    { key: 'all', label: 'Все' },
-    { key: 'process', label: 'В процессе' },
-    { key: 'review', label: 'На рассмотрении' },
-    { key: 'done', label: 'Закончены' },
+    {key: 'all', label: 'Все'},
+    {key: 'process', label: 'В процессе'},
+    {key: 'review', label: 'На рассмотрении'},
+    {key: 'done', label: 'Закончены'},
+];
+
+type DateFilter = 'all' | 'today' | 'week' | 'overdue' | 'selected';
+
+const DATE_FILTER_OPTIONS: Array<{ key: DateFilter; label: string }> = [
+    {key: 'all', label: 'Все даты'},
+    {key: 'today', label: 'Сегодня'},
+    {key: 'week', label: 'Неделя'},
+    {key: 'overdue', label: 'Просрочено'},
 ];
 
 const today = new Date('2026-04-15');
@@ -79,6 +91,16 @@ const isToday = (date: string) => {
     return d.toDateString() === today.toDateString();
 };
 
+const isSameDay = (dateString: string, targetDate: Date) => {
+    const date = new Date(dateString);
+
+    return (
+        date.getFullYear() === targetDate.getFullYear() &&
+        date.getMonth() === targetDate.getMonth() &&
+        date.getDate() === targetDate.getDate()
+    );
+};
+
 const isThisWeek = (date: string) => {
     const d = new Date(date);
     const diff = d.getTime() - today.getTime();
@@ -92,7 +114,7 @@ interface TaskCardProps {
     onPress: (task: Task) => void;
 }
 
-function TaskCard({ item, color, onPress }: TaskCardProps) {
+function TaskCard({item, color, onPress}: TaskCardProps) {
     const priority = PRIORITY_META[item.priority];
 
     return (
@@ -100,7 +122,7 @@ function TaskCard({ item, color, onPress }: TaskCardProps) {
             <View style={styles.taskRowContainer}>
                 <View style={styles.taskTopRow}>
                     <View style={styles.dummyTaskRow}>
-                        <View style={[styles.taskDot, { backgroundColor: color }]} />
+                        <View style={[styles.taskDot, {backgroundColor: color}]}/>
                         <Text style={styles.taskText}>{item.title}</Text>
                     </View>
 
@@ -108,7 +130,7 @@ function TaskCard({ item, color, onPress }: TaskCardProps) {
                         name="drag-vertical"
                         size={20}
                         color="#666"
-                        style={{ marginLeft: 8 }}
+                        style={{marginLeft: 8}}
                     />
                 </View>
 
@@ -122,10 +144,10 @@ function TaskCard({ item, color, onPress }: TaskCardProps) {
                     <View
                         style={[
                             styles.priorityBadge,
-                            { backgroundColor: `${priority.color}18` },
+                            {backgroundColor: `${priority.color}18`},
                         ]}
                     >
-                        <Text style={[styles.priorityText, { color: priority.color }]}>
+                        <Text style={[styles.priorityText, {color: priority.color}]}>
                             {priority.label}
                         </Text>
                     </View>
@@ -161,7 +183,7 @@ function StatusChip({
     return (
         <DraxView
             receptive
-            onReceiveDragDrop={({ dragged: { payload } }) => {
+            onReceiveDragDrop={({dragged: {payload}}) => {
                 const task = payload as Task;
                 onDropTask(task, statusKey);
             }}
@@ -183,7 +205,7 @@ function StatusChip({
                     >
                         <View style={styles.chipLeft}>
                             <View style={styles.chipCountBox}>
-                                <Text style={[styles.chipCountText, { color: meta.color }]}>
+                                <Text style={[styles.chipCountText, {color: meta.color}]}>
                                     {tasks.length}
                                 </Text>
                             </View>
@@ -198,7 +220,7 @@ function StatusChip({
                     </TouchableOpacity>
 
                     {isExpanded && (
-                        <View style={[styles.expandedContent, { borderColor: meta.color }]}>
+                        <View style={[styles.expandedContent, {borderColor: meta.color}]}>
                             {tasks.length === 0 ? (
                                 <Text style={styles.emptyText}>Задач нет</Text>
                             ) : (
@@ -232,6 +254,11 @@ function StatusChip({
 
 export default function DashboardScreen() {
     const navigation = useNavigation();
+
+    const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+    const [tempDate, setTempDate] = useState<Date>(selectedDate ?? today);
 
     const [expandedStates, setExpandedStates] = useState({
         process: true,
@@ -283,9 +310,9 @@ export default function DashboardScreen() {
     ]);
 
     const [activities, setActivities] = useState<ActivityItem[]>([
-        { id: 'a1', text: 'Айдана обновила иллюстрации', time: '09:10' },
-        { id: 'a2', text: 'Олжас отправил задачу на review', time: '10:25' },
-        { id: 'a3', text: 'Мади завершил верстку хедера', time: '11:40' },
+        {id: 'a1', text: 'Айдана обновила иллюстрации', time: '09:10'},
+        {id: 'a2', text: 'Олжас отправил задачу на review', time: '10:25'},
+        {id: 'a3', text: 'Мади завершил верстку хедера', time: '11:40'},
     ]);
 
     const [search, setSearch] = useState('');
@@ -329,7 +356,7 @@ export default function DashboardScreen() {
 
         setTasks((prev) =>
             prev.map((t) =>
-                t.id === task.id ? { ...t, status: newStatus } : t
+                t.id === task.id ? {...t, status: newStatus} : t
             )
         );
 
@@ -363,7 +390,7 @@ export default function DashboardScreen() {
     const updateSelectedTask = (patch: Partial<Task>) => {
         if (!selectedTask) return;
 
-        const updated = { ...selectedTask, ...patch };
+        const updated = {...selectedTask, ...patch};
         setSelectedTask(updated);
 
         setTasks((prev) =>
@@ -380,10 +407,22 @@ export default function DashboardScreen() {
             const matchesStatus =
                 statusFilter === 'all' ? true : task.status === statusFilter;
 
-            return matchesSearch && matchesStatus;
-        });
-    }, [tasks, search, statusFilter]);
+            const matchesDate =
+                dateFilter === 'all'
+                    ? true
+                    : dateFilter === 'today'
+                        ? isToday(task.deadline) && task.status !== 'done'
+                        : dateFilter === 'week'
+                            ? isThisWeek(task.deadline) && task.status !== 'done'
+                            : dateFilter === 'overdue'
+                                ? isOverdue(task.deadline, task.status)
+                                : selectedDate
+                                    ? isSameDay(task.deadline, selectedDate)
+                                    : true;
 
+            return matchesSearch && matchesStatus && matchesDate;
+        });
+    }, [tasks, search, statusFilter, dateFilter, selectedDate]);
     const processTasks = useMemo(
         () => filteredTasks.filter((task) => task.status === 'process'),
         [filteredTasks]
@@ -423,8 +462,34 @@ export default function DashboardScreen() {
         });
     }, [tasks]);
 
+    const availableProjects = useMemo(() => {
+        return Array.from(new Set(tasks.map((task) => task.project)));
+    }, [tasks]);
+
+    const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            if (event.type === 'dismissed') {
+                setIsDatePickerOpen(false);
+                return;
+            }
+
+            if (date) {
+                setSelectedDate(date);
+                setTempDate(date);
+                setDateFilter('selected');
+            }
+
+            setIsDatePickerOpen(false);
+            return;
+        }
+
+        if (date) {
+            setTempDate(date);
+        }
+    };
+
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
+        <GestureHandlerRootView style={{flex: 1}}>
             <DraxProvider>
                 <SafeAreaView style={styles.container}>
                     <DraxScrollView
@@ -439,13 +504,13 @@ export default function DashboardScreen() {
                                     style={styles.addButton}
                                     onPress={() => setIsCreateModalOpen(true)}
                                 >
-                                    <Ionicons name="add" size={20} color="#FFF" />
+                                    <Ionicons name="add" size={20} color="#FFF"/>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
                                 >
-                                    <Feather name="menu" size={28} color="#000" />
+                                    <Feather name="menu" size={28} color="#000"/>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -467,8 +532,19 @@ export default function DashboardScreen() {
                                 />
                             </View>
 
-                            <TouchableOpacity style={styles.calendarButton}>
-                                <Ionicons name="calendar-outline" size={20} color="#FFF" />
+                            <TouchableOpacity
+                                style={styles.calendarButton}
+                                onPress={() => {
+                                    setTempDate(selectedDate ?? today);
+
+                                    if (Platform.OS === 'android') {
+                                        setIsDatePickerOpen(true);
+                                    } else {
+                                        setIsDatePickerOpen(true);
+                                    }
+                                }}
+                            >
+                                <Ionicons name="calendar-outline" size={20} color="#FFF"/>
                             </TouchableOpacity>
                         </View>
 
@@ -491,6 +567,54 @@ export default function DashboardScreen() {
                                             ]}
                                         >
                                             {option.label}
+
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+
+
+                        </View>
+                        {selectedDate && dateFilter === 'selected' && (
+                            <View style={styles.selectedDateRow}>
+                                <Text style={styles.selectedDateText}>
+                                    Выбрана дата: {selectedDate.toLocaleDateString('ru-RU')}
+                                </Text>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSelectedDate(null);
+                                        setDateFilter('all');
+                                    }}
+                                >
+                                    <Text style={styles.clearDateText}>Сбросить</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Фильтр по календарю</Text>
+                        </View>
+
+                        <View style={styles.filterRow}>
+                            {DATE_FILTER_OPTIONS.map((option) => {
+                                const active = dateFilter === option.key;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={option.key}
+                                        style={[
+                                            styles.filterChip,
+                                            active && styles.filterChipActive,
+                                        ]}
+                                        onPress={() => setDateFilter(option.key)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.filterChipText,
+                                                active && styles.filterChipTextActive,
+                                            ]}
+                                        >
+                                            {option.label}
                                         </Text>
                                     </TouchableOpacity>
                                 );
@@ -498,15 +622,15 @@ export default function DashboardScreen() {
                         </View>
 
                         <View style={styles.statsRow}>
-                            <View style={[styles.statCard, { borderColor: '#EF4444' }]}>
+                            <View style={[styles.statCard, {borderColor: '#EF4444'}]}>
                                 <Text style={styles.statValue}>{overdueCount}</Text>
                                 <Text style={styles.statLabel}>Просрочено</Text>
                             </View>
-                            <View style={[styles.statCard, { borderColor: '#4169E1' }]}>
+                            <View style={[styles.statCard, {borderColor: '#4169E1'}]}>
                                 <Text style={styles.statValue}>{todayCount}</Text>
                                 <Text style={styles.statLabel}>На сегодня</Text>
                             </View>
-                            <View style={[styles.statCard, { borderColor: '#22C55E' }]}>
+                            <View style={[styles.statCard, {borderColor: '#22C55E'}]}>
                                 <Text style={styles.statValue}>{weekCount}</Text>
                                 <Text style={styles.statLabel}>На неделю</Text>
                             </View>
@@ -547,7 +671,7 @@ export default function DashboardScreen() {
                             <View key={project.project} style={styles.projectCard}>
                                 <View style={styles.projectCardLeft}>
                                     <View style={styles.projectIconDark}>
-                                        <Ionicons name="rocket-outline" size={20} color="#FFF" />
+                                        <Ionicons name="rocket-outline" size={20} color="#FFF"/>
                                     </View>
 
                                     <View>
@@ -564,7 +688,7 @@ export default function DashboardScreen() {
                                         <View
                                             style={[
                                                 styles.progressFill,
-                                                { width: `${project.progress}%` },
+                                                {width: `${project.progress}%`},
                                             ]}
                                         />
                                     </View>
@@ -579,8 +703,8 @@ export default function DashboardScreen() {
                         <View style={styles.activityBox}>
                             {activities.map((activity) => (
                                 <View key={activity.id} style={styles.activityItem}>
-                                    <View style={styles.activityDot} />
-                                    <View style={{ flex: 1 }}>
+                                    <View style={styles.activityDot}/>
+                                    <View style={{flex: 1}}>
                                         <Text style={styles.activityText}>{activity.text}</Text>
                                         <Text style={styles.activityTime}>{activity.time}</Text>
                                     </View>
@@ -599,23 +723,44 @@ export default function DashboardScreen() {
                                     placeholder="Название"
                                     value={newTask.title}
                                     onChangeText={(text) =>
-                                        setNewTask((prev) => ({ ...prev, title: text }))
+                                        setNewTask((prev) => ({...prev, title: text}))
                                     }
                                 />
-                                <TextInput
-                                    style={styles.modalInput}
-                                    placeholder="Проект"
-                                    value={newTask.project}
-                                    onChangeText={(text) =>
-                                        setNewTask((prev) => ({ ...prev, project: text }))
-                                    }
-                                />
+                                <Text style={styles.modalFieldTitle}>Проект</Text>
+
+                                <View style={styles.projectSelectorList}>
+                                    {availableProjects.map((project) => {
+                                        const active = newTask.project === project;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={project}
+                                                style={[
+                                                    styles.projectOptionChip,
+                                                    active && styles.projectOptionChipActive,
+                                                ]}
+                                                onPress={() =>
+                                                    setNewTask((prev) => ({ ...prev, project }))
+                                                }
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.projectOptionText,
+                                                        active && styles.projectOptionTextActive,
+                                                    ]}
+                                                >
+                                                    {project}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
                                 <TextInput
                                     style={styles.modalInput}
                                     placeholder="Исполнитель"
                                     value={newTask.assignee}
                                     onChangeText={(text) =>
-                                        setNewTask((prev) => ({ ...prev, assignee: text }))
+                                        setNewTask((prev) => ({...prev, assignee: text}))
                                     }
                                 />
                                 <TextInput
@@ -623,7 +768,7 @@ export default function DashboardScreen() {
                                     placeholder="Дедлайн YYYY-MM-DD"
                                     value={newTask.deadline}
                                     onChangeText={(text) =>
-                                        setNewTask((prev) => ({ ...prev, deadline: text }))
+                                        setNewTask((prev) => ({...prev, deadline: text}))
                                     }
                                 />
                                 <TextInput
@@ -632,7 +777,7 @@ export default function DashboardScreen() {
                                     multiline
                                     value={newTask.description}
                                     onChangeText={(text) =>
-                                        setNewTask((prev) => ({ ...prev, description: text }))
+                                        setNewTask((prev) => ({...prev, description: text}))
                                     }
                                 />
 
@@ -647,7 +792,7 @@ export default function DashboardScreen() {
                                                     active && styles.optionChipActive,
                                                 ]}
                                                 onPress={() =>
-                                                    setNewTask((prev) => ({ ...prev, priority: p }))
+                                                    setNewTask((prev) => ({...prev, priority: p}))
                                                 }
                                             >
                                                 <Text style={styles.optionChipText}>
@@ -669,7 +814,7 @@ export default function DashboardScreen() {
                                                     active && styles.optionChipActive,
                                                 ]}
                                                 onPress={() =>
-                                                    setNewTask((prev) => ({ ...prev, status: s }))
+                                                    setNewTask((prev) => ({...prev, status: s}))
                                                 }
                                             >
                                                 <Text style={styles.optionChipText}>
@@ -710,28 +855,28 @@ export default function DashboardScreen() {
                                             style={styles.modalInput}
                                             value={selectedTask.title}
                                             onChangeText={(text) =>
-                                                updateSelectedTask({ title: text })
+                                                updateSelectedTask({title: text})
                                             }
                                         />
                                         <TextInput
                                             style={styles.modalInput}
                                             value={selectedTask.project}
                                             onChangeText={(text) =>
-                                                updateSelectedTask({ project: text })
+                                                updateSelectedTask({project: text})
                                             }
                                         />
                                         <TextInput
                                             style={styles.modalInput}
                                             value={selectedTask.assignee}
                                             onChangeText={(text) =>
-                                                updateSelectedTask({ assignee: text })
+                                                updateSelectedTask({assignee: text})
                                             }
                                         />
                                         <TextInput
                                             style={styles.modalInput}
                                             value={selectedTask.deadline}
                                             onChangeText={(text) =>
-                                                updateSelectedTask({ deadline: text })
+                                                updateSelectedTask({deadline: text})
                                             }
                                         />
                                         <TextInput
@@ -739,7 +884,7 @@ export default function DashboardScreen() {
                                             multiline
                                             value={selectedTask.description}
                                             onChangeText={(text) =>
-                                                updateSelectedTask({ description: text })
+                                                updateSelectedTask({description: text})
                                             }
                                         />
 
@@ -754,7 +899,7 @@ export default function DashboardScreen() {
                                                             active && styles.optionChipActive,
                                                         ]}
                                                         onPress={() =>
-                                                            updateSelectedTask({ priority: p })
+                                                            updateSelectedTask({priority: p})
                                                         }
                                                     >
                                                         <Text style={styles.optionChipText}>
@@ -776,7 +921,7 @@ export default function DashboardScreen() {
                                                             active && styles.optionChipActive,
                                                         ]}
                                                         onPress={() =>
-                                                            updateSelectedTask({ status: s })
+                                                            updateSelectedTask({status: s})
                                                         }
                                                     >
                                                         <Text style={styles.optionChipText}>
@@ -800,6 +945,71 @@ export default function DashboardScreen() {
                             </View>
                         </View>
                     </Modal>
+                    {Platform.OS === 'ios' && (
+                        <Modal
+                            visible={isDatePickerOpen}
+                            transparent
+                            animationType="fade"
+                            onRequestClose={() => setIsDatePickerOpen(false)}
+                        >
+                            <View style={styles.modalOverlay}>
+                                <View style={styles.dateModalCard}>
+                                    <Text style={styles.modalTitle}>Выбери дату</Text>
+
+                                    <DateTimePicker
+                                        value={tempDate}
+                                        mode="date"
+                                        display="spinner"
+                                        onChange={handleDateChange}
+                                        style={styles.iosDatePicker}
+                                        themeVariant="light"
+                                    />
+
+                                    <View style={styles.modalActions}>
+                                        <Pressable
+                                            style={styles.modalSecondaryButton}
+                                            onPress={() => setIsDatePickerOpen(false)}
+                                        >
+                                            <Text style={styles.modalSecondaryButtonText}>Отмена</Text>
+                                        </Pressable>
+
+                                        <Pressable
+                                            style={styles.modalPrimaryButton}
+                                            onPress={() => {
+                                                setSelectedDate(tempDate);
+                                                setDateFilter('selected');
+                                                setIsDatePickerOpen(false);
+                                            }}
+                                        >
+                                            <Text style={styles.modalPrimaryButtonText}>Применить</Text>
+                                        </Pressable>
+                                    </View>
+
+                                    {selectedDate && (
+                                        <Pressable
+                                            style={styles.clearDateButton}
+                                            onPress={() => {
+                                                setSelectedDate(null);
+                                                setDateFilter('all');
+                                                setIsDatePickerOpen(false);
+                                            }}
+                                        >
+                                            <Text style={styles.clearDateButtonText}>Сбросить дату</Text>
+                                        </Pressable>
+                                    )}
+                                </View>
+                            </View>
+                        </Modal>
+                    )}
+
+                    {Platform.OS === 'android' && isDatePickerOpen && (
+                        <DateTimePicker
+                            value={tempDate}
+                            mode="date"
+                            display="default"
+                            onChange={handleDateChange}
+                        />
+                    )}
                 </SafeAreaView>
             </DraxProvider>
         </GestureHandlerRootView>
@@ -807,6 +1017,10 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+    iosDatePicker: {
+        alignSelf: 'stretch',
+        backgroundColor: '#FFF',
+    },
     container: {
         flex: 1,
         backgroundColor: '#FAFAFA',
@@ -925,7 +1139,7 @@ const styles = StyleSheet.create({
         borderRadius: 30,
     },
     activeDropZoneWrapper: {
-        transform: [{ scale: 1.01 }],
+        transform: [{scale: 1.01}],
         opacity: 0.96,
     },
     chip: {
@@ -1224,5 +1438,77 @@ const styles = StyleSheet.create({
     modalPrimaryButtonText: {
         color: '#FFF',
         fontWeight: '600',
+    },
+    selectedDateRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+        paddingHorizontal: 4,
+    },
+
+    selectedDateText: {
+        fontSize: 12,
+        color: '#374151',
+        fontWeight: '500',
+    },
+
+    clearDateText: {
+        fontSize: 12,
+        color: '#4169E1',
+        fontWeight: '600',
+    },
+    dateModalCard: {
+        backgroundColor: '#FFF',
+        marginHorizontal: 20,
+        borderRadius: 24,
+        padding: 20,
+    },
+
+    clearDateButton: {
+        marginTop: 8,
+        alignSelf: 'center',
+        paddingVertical: 8,
+    },
+
+    clearDateButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4169E1',
+    },
+    modalFieldTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 10,
+        marginTop: 4,
+    },
+
+    projectSelectorList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 12,
+    },
+
+    projectOptionChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 14,
+        backgroundColor: '#F3F4F6',
+    },
+
+    projectOptionChipActive: {
+        backgroundColor: '#4169E1',
+    },
+
+    projectOptionText: {
+        fontSize: 12,
+        color: '#111827',
+        fontWeight: '500',
+    },
+
+    projectOptionTextActive: {
+        color: '#FFF',
     },
 });

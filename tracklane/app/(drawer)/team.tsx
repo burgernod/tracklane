@@ -15,10 +15,18 @@ import {
     Animated,
 } from 'react-native';
 
+interface AvailableUser {
+    id: string;
+    name: string;
+    color: string;
+}
+
 import {Ionicons, Feather} from '@expo/vector-icons';
-import {useNavigation} from 'expo-router';
+import {useNavigation, useRouter} from 'expo-router';
 import {DrawerActions} from '@react-navigation/native';
 import {Image} from 'expo-image';
+
+
 
 type TeamRole = 'admin' | 'reviewer' | 'member';
 
@@ -37,7 +45,6 @@ const ROLE_LABELS: Record<TeamRole, string> = {
 
 const ROLE_ORDER: TeamRole[] = ['admin', 'reviewer', 'member'];
 
-const randomAvatarColors = ['#FCA311', '#2EC4B6', '#FF6B6B', '#A0A0A0', '#000000', '#E84142', '#7C3AED', '#0EA5E9'];
 
 const UserRow = ({
                      name,
@@ -64,6 +71,7 @@ const UserRow = ({
 
 export default function TeamManagementScreen() {
     const navigation = useNavigation();
+    const router = useRouter();
 
     const [members, setMembers] = useState<TeamMember[]>([
         {id: '1', name: 'Крис Эванс', color: '#FCA311', role: 'admin'},
@@ -74,8 +82,19 @@ export default function TeamManagementScreen() {
         {id: '6', name: 'Джон Джонсон', color: '#E84142', role: 'member'},
     ]);
 
+    const [allUsers] = useState([
+        {id: 'u1', name: 'Крис Эванс', color: '#FCA311'},
+        {id: 'u2', name: 'Джон Джонсон', color: '#2EC4B6'},
+        {id: 'u3', name: 'Айдана Серик', color: '#FF6B6B'},
+        {id: 'u4', name: 'Жансерик Базаров', color: '#0EA5E9'},
+        {id: 'u5', name: 'Олжас Нурлан', color: '#7C3AED'},
+        {id: 'u6', name: 'Мади Ержан', color: '#000000'},
+        {id: 'u7', name: 'Алина Касым', color: '#A0A0A0'},
+        {id: 'u8', name: 'Динара Толеу', color: '#E84142'},
+    ]);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [newMemberName, setNewMemberName] = useState('');
+    const [userSearch, setUserSearch] = useState('');
     const [selectedRole, setSelectedRole] = useState<TeamRole>('member');
 
     const groupedMembers = useMemo(() => {
@@ -89,27 +108,36 @@ export default function TeamManagementScreen() {
     const closeModal = () => {
         Keyboard.dismiss();
         setIsModalOpen(false);
-        setNewMemberName('');
+        setUserSearch('');
         setSelectedRole('member');
     };
 
-    const addMember = () => {
-        const trimmedName = newMemberName.trim();
-        if (!trimmedName) return;
+    const addUserToProject = (user: AvailableUser) => {
+        const alreadyExists = members.some((member) => member.id === user.id);
 
-        const randomColor =
-            randomAvatarColors[Math.floor(Math.random() * randomAvatarColors.length)];
+        if (alreadyExists) return;
 
         const newMember: TeamMember = {
-            id: Date.now().toString(),
-            name: trimmedName,
-            color: randomColor,
+            id: user.id,
+            name: user.name,
+            color: user.color,
             role: selectedRole,
         };
 
         setMembers((prev) => [...prev, newMember]);
         closeModal();
     };
+
+    const filteredUsers = useMemo(() => {
+        const query = userSearch.trim().toLowerCase();
+
+        return allUsers.filter((user) => {
+            const matchesSearch = user.name.toLowerCase().includes(query);
+            const notInProject = !members.some((member) => member.id === user.id);
+
+            return matchesSearch && notInProject;
+        });
+    }, [allUsers, userSearch, members]);
 
     const removeMember = (id: string) => {
         setMembers((prev) => prev.filter((member) => member.id !== id));
@@ -145,171 +173,204 @@ export default function TeamManagementScreen() {
         };
     }, [keyboardHeight]);
 
-    return (
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            <SafeAreaView style={styles.container}>
-                <View style={styles.content}>
-                    <View style={styles.header}>
-                        <View style={styles.headerLeft}>
-                            <TouchableOpacity style={styles.backButton}>
-                                <Ionicons name="arrow-back" size={24} color="#000"/>
-                            </TouchableOpacity>
-                            <Text style={styles.headerTitle}>Управление Командой</Text>
-                        </View>
+    const SelectableUserRow = ({
+                                   name,
+                                   color,
+                                   onPress,
+                               }: {
+        name: string;
+        color: string;
+        onPress: () => void;
+    }) => (
+        <TouchableOpacity style={styles.selectableUserRow} onPress={onPress}>
+            <View style={styles.userLeft}>
+                <View style={[styles.avatar, {backgroundColor: color}]}/>
+                <Text style={styles.userName}>{name}</Text>
+            </View>
 
-                        <View style={styles.headerActions}>
-                            <TouchableOpacity
-                                style={styles.addButton}
-                                onPress={() => setIsModalOpen(true)}
-                            >
-                                <Ionicons name="person-add" size={20} color="#FFF"/>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-                            >
-                                <Feather name="menu" size={28} color="#000"/>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                    >
-                        <View style={styles.projectInfoRow}>
-                            <View style={styles.projectLeft}>
-                                <Image
-                                    source={require('../../assets/images/tracklane-logo-circle.svg')}
-                                    style={styles.projectIcon}
-                                    contentFit="contain"
-                                />
-                                <View>
-                                    <Text style={styles.projectTitle}>Проект Аврора</Text>
-                                    <Text style={styles.projectSubtitle}>
-                                        Всего участников: {members.length}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-
-                        {ROLE_ORDER.map((role, index) => {
-                            const roleMembers = groupedMembers[role];
-
-                            return (
-                                <View key={role}>
-                                    <View style={styles.sectionHeader}>
-                                        <Text style={styles.sectionTitle}>{ROLE_LABELS[role]}</Text>
-                                        <Ionicons
-                                            name="people-circle"
-                                            size={18}
-                                            color="#4169E1"
-                                            style={{marginLeft: 8}}
-                                        />
-                                        <View style={styles.countBadge}>
-                                            <Text style={styles.countBadgeText}>{roleMembers.length}</Text>
-                                        </View>
-                                    </View>
-
-                                    {roleMembers.length === 0 ? (
-                                        <Text style={styles.emptyRoleText}>Пока никого нет</Text>
-                                    ) : (
-                                        roleMembers.map((user) => (
-                                            <UserRow
-                                                key={user.id}
-                                                name={user.name}
-                                                color={user.color}
-                                                onRemove={() => removeMember(user.id)}
-                                            />
-                                        ))
-                                    )}
-
-                                    {index !== ROLE_ORDER.length - 1 && <View style={styles.divider}/>}
-                                </View>
-                            );
-                        })}
-                    </ScrollView>
-
-                    <Modal
-                        visible={isModalOpen}
-                        transparent
-                        animationType="slide"
-                        onRequestClose={closeModal}
-                    >
-                        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-                            <View style={styles.modalOverlay}>
-                                <TouchableWithoutFeedback accessible={false}>
-                                    <View style={styles.modalCard}>
-                                        <ScrollView
-                                            keyboardShouldPersistTaps="handled"
-                                            showsVerticalScrollIndicator={false}
-                                            contentContainerStyle={styles.modalScrollContent}
-                                        >
-                                            <Text style={styles.modalTitle}>Добавить человека</Text>
-
-                                            <TextInput
-                                                style={styles.modalInput}
-                                                placeholder="Имя участника"
-                                                value={newMemberName}
-                                                onChangeText={setNewMemberName}
-                                                returnKeyType="done"
-                                            />
-
-                                            <Text style={styles.roleTitle}>Выбери роль</Text>
-
-                                            <View style={styles.rolesRow}>
-                                                {ROLE_ORDER.map((role) => {
-                                                    const active = selectedRole === role;
-
-                                                    return (
-                                                        <TouchableOpacity
-                                                            key={role}
-                                                            style={[
-                                                                styles.roleChip,
-                                                                active && styles.roleChipActive,
-                                                            ]}
-                                                            onPress={() => setSelectedRole(role)}
-                                                        >
-                                                            <Text
-                                                                style={[
-                                                                    styles.roleChipText,
-                                                                    active && styles.roleChipTextActive,
-                                                                ]}
-                                                            >
-                                                                {ROLE_LABELS[role]}
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    );
-                                                })}
-                                            </View>
-
-                                            <View style={styles.modalActions}>
-                                                <Pressable
-                                                    style={styles.modalSecondaryButton}
-                                                    onPress={closeModal}
-                                                >
-                                                    <Text style={styles.modalSecondaryButtonText}>Отмена</Text>
-                                                </Pressable>
-
-                                                <Pressable
-                                                    style={styles.modalPrimaryButton}
-                                                    onPress={addMember}
-                                                >
-                                                    <Text style={styles.modalPrimaryButtonText}>Добавить</Text>
-                                                </Pressable>
-                                            </View>
-
-                                            <Animated.View style={{height: keyboardHeight}}/>
-                                        </ScrollView>
-                                    </View>
-                                </TouchableWithoutFeedback>
-                            </View>
-                        </TouchableWithoutFeedback>
-                    </Modal>
-                </View>
-            </SafeAreaView>
-        </TouchableWithoutFeedback>
+            <Ionicons name="add-circle" size={22} color="#4169E1"/>
+        </TouchableOpacity>
     );
+
+    return (
+        <ScrollView>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                <SafeAreaView style={styles.container}>
+                    <View style={styles.content}>
+                        <View style={styles.header}>
+                            <View style={styles.headerLeft}>
+                                <TouchableOpacity
+                                    style={styles.backButton}
+                                    onPress={() => router.back()}
+                                >
+                                    <Ionicons name="arrow-back" size={24} color="#000"/>
+                                </TouchableOpacity>
+                                <Text style={styles.headerTitle}>Управление Командой</Text>
+                            </View>
+
+                            <View style={styles.headerActions}>
+                                <TouchableOpacity
+                                    style={styles.addButton}
+                                    onPress={() => setIsModalOpen(true)}
+                                >
+                                    <Ionicons name="person-add" size={20} color="#FFF"/>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+                                >
+                                    <Feather name="menu" size={28} color="#000"/>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <View style={styles.projectInfoRow}>
+                                <View style={styles.projectLeft}>
+                                    <Image
+                                        source={require('../../assets/images/tracklane-logo-circle.svg')}
+                                        style={styles.projectIcon}
+                                        contentFit="contain"
+                                    />
+                                    <View>
+                                        <Text style={styles.projectTitle}>Проект Аврора</Text>
+                                        <Text style={styles.projectSubtitle}>
+                                            Всего участников: {members.length}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {ROLE_ORDER.map((role, index) => {
+                                const roleMembers = groupedMembers[role];
+
+                                return (
+                                    <View key={role}>
+                                        <View style={styles.sectionHeader}>
+                                            <Text style={styles.sectionTitle}>{ROLE_LABELS[role]}</Text>
+                                            <Ionicons
+                                                name="people-circle"
+                                                size={18}
+                                                color="#4169E1"
+                                                style={{marginLeft: 8}}
+                                            />
+                                            <View style={styles.countBadge}>
+                                                <Text style={styles.countBadgeText}>{roleMembers.length}</Text>
+                                            </View>
+                                        </View>
+
+                                        {roleMembers.length === 0 ? (
+                                            <Text style={styles.emptyRoleText}>Пока никого нет</Text>
+                                        ) : (
+                                            roleMembers.map((user) => (
+                                                <UserRow
+                                                    key={user.id}
+                                                    name={user.name}
+                                                    color={user.color}
+                                                    onRemove={() => removeMember(user.id)}
+                                                />
+                                            ))
+                                        )}
+
+                                        {index !== ROLE_ORDER.length - 1 && <View style={styles.divider}/>}
+                                    </View>
+                                );
+                            })}
+                        </ScrollView>
+
+                        <Modal
+                            visible={isModalOpen}
+                            transparent
+                            animationType="slide"
+                            onRequestClose={closeModal}
+                        >
+                            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                                <View style={styles.modalOverlay}>
+                                    <TouchableWithoutFeedback accessible={false}>
+                                        <View style={styles.modalCard}>
+                                            <ScrollView
+                                                keyboardShouldPersistTaps="handled"
+                                                showsVerticalScrollIndicator={false}
+                                                contentContainerStyle={styles.modalScrollContent}
+                                            >
+                                                <Text style={styles.modalTitle}>Добавить человека</Text>
+
+                                                <TextInput
+                                                    style={styles.modalInput}
+                                                    placeholder="Поиск участника"
+                                                    value={userSearch}
+                                                    onChangeText={setUserSearch}
+                                                    returnKeyType="search"
+                                                />
+
+                                                <Text style={styles.roleTitle}>Выбери роль</Text>
+
+                                                <View style={styles.rolesRow}>
+                                                    {ROLE_ORDER.map((role) => {
+                                                        const active = selectedRole === role;
+
+                                                        return (
+                                                            <TouchableOpacity
+                                                                key={role}
+                                                                style={[
+                                                                    styles.roleChip,
+                                                                    active && styles.roleChipActive,
+                                                                ]}
+                                                                onPress={() => setSelectedRole(role)}
+                                                            >
+                                                                <Text
+                                                                    style={[
+                                                                        styles.roleChipText,
+                                                                        active && styles.roleChipTextActive,
+                                                                    ]}
+                                                                >
+                                                                    {ROLE_LABELS[role]}
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                        );
+                                                    })}
+                                                </View>
+
+                                                <Text style={styles.roleTitle}>Доступные пользователи</Text>
+
+                                                {filteredUsers.length === 0 ? (
+                                                    <Text style={styles.emptyUsersText}>Никого не найдено</Text>
+                                                ) : (
+                                                    filteredUsers.map((user) => (
+                                                        <SelectableUserRow
+                                                            key={user.id}
+                                                            name={user.name}
+                                                            color={user.color}
+                                                            onPress={() => addUserToProject(user)}
+                                                        />
+                                                    ))
+                                                )}
+
+                                                <View style={styles.modalActions}>
+                                                    <Pressable
+                                                        style={styles.modalSecondaryButton}
+                                                        onPress={closeModal}
+                                                    >
+                                                        <Text style={styles.modalSecondaryButtonText}>Закрыть</Text>
+                                                    </Pressable>
+                                                </View>
+                                                <Animated.View style={{height: keyboardHeight}}/>
+                                            </ScrollView>
+                                        </View>
+                                    </TouchableWithoutFeedback>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </Modal>
+                    </View>
+                </SafeAreaView>
+
+            </TouchableWithoutFeedback>
+        </ScrollView>
+    )
+        ;
 }
 
 const styles = StyleSheet.create({
@@ -534,5 +595,19 @@ const styles = StyleSheet.create({
     modalScrollContent: {
         padding: 20,
         paddingBottom: 12,
+    },
+    selectableUserRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+
+    emptyUsersText: {
+        color: '#9CA3AF',
+        fontSize: 14,
+        marginBottom: 8,
     },
 });
