@@ -1,19 +1,285 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform, TextInput, Alert, ActivityIndicator, Image } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useNavigation } from 'expo-router';
-import { DrawerActions } from '@react-navigation/native';
+import { DrawerActions, CommonActions } from '@react-navigation/native';
+import { useRootNavigation } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker'; 
+import * as SecureStore from 'expo-secure-store';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dm88hpprs/image/upload';
+const UPLOAD_PRESET = 'ml_profile';
 
 export default function UserProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  const rootNavigation = useRootNavigation();
+
+  // Состояния для данных пользователя
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  
+  // Стейты для смены пароля
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Функция выбора и загрузки фото
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      uploadImage(result.assets[0].uri);
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+  setSaving(true);
+  
+  // Получаем расширение файла
+  const fileType = uri.split('.').pop();
+  
+  const data = new FormData();
+  // Формируем объект файла правильно для React Native
+  data.append('file', {
+    uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+    type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
+    name: `avatar.${fileType}`,
+  } as any);
+  
+  data.append('upload_preset', UPLOAD_PRESET);
+
+  try {
+    console.log("Начинаю загрузку в Cloudinary...");
+    const res = await fetch(CLOUDINARY_URL, {
+      method: 'POST',
+      body: data,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    const file = await res.json();
+    
+    if (!res.ok) {
+      console.log("Ошибка Cloudinary:", file);
+      throw new Error(file.error?.message || "Cloudinary error");
+    }
+
+    const imageUrl = file.secure_url;
+    console.log("Фото загружено в облако:", imageUrl);
+
+    // Сохраняем ссылку в нашу БД
+    const token = await SecureStore.getItemAsync('userToken');
+    const dbRes = await fetch(`${API_URL}/api/v1/users/me/avatar`, {
+      method: 'PATCH',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify({ avatar_url: imageUrl })
+    });
+
+    if (dbRes.ok) {
+      setAvatarUrl(imageUrl);
+      Alert.alert("Успех", "Фото профиля сохранено в базе данных");
+    } else {
+      const dbErr = await dbRes.json();
+      console.log("Ошибка БД:", dbErr);
+      Alert.alert("Ошибка", "Ссылка не сохранилась в БД");
+    }
+  } catch (e: any) {
+    console.log("Полная ошибка процесса:", e);
+    Alert.alert("Ошибка", e.message || "Не удалось загрузить фото");
+  } finally {
+    setSaving(false);
+  }
+};
+
+const removeImage = () => {
+    console.log("Кнопка удаления нажата"); // Для отладки в консоли
+    Alert.alert(
+      "Удалить фото",
+      "Вы уверены?",
+      [
+        { text: "Отмена", style: "cancel" },
+        {
+          text: "Удалить",
+          style: "destructive",
+          onPress: async () => {
+            setSaving(true);
+            try {
+              const token = await SecureStore.getItemAsync('userToken');
+              console.log("Отправка запроса на удаление...");
+              
+              const response = await fetch(`${API_URL}/api/v1/users/me/avatar`, {
+                method: 'PATCH',
+                headers: { 
+                  'Content-Type': 'application/json', 
+                  'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ avatar_url: null }) 
+              });
+
+              if (response.ok) {
+                setAvatarUrl(null); // Убираем из UI
+                Alert.alert("Успех", "Фото удалено из профиля");
+              } else {
+                const errorData = await response.json();
+                console.log("Ошибка сервера:", errorData);
+                Alert.alert("Ошибка", "Сервер не разрешил удалить фото");
+              }
+            } catch (e) {
+              console.log("Ошибка сети:", e);
+              Alert.alert("Ошибка", "Нет связи с сервером");
+            } finally {
+              setSaving(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Ошибка", "Новые пароли не совпадают");
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const response = await fetch(`${API_URL}/api/v1/users/me/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+      });
+      if (response.ok) {
+        Alert.alert("Успех", "Пароль изменен");
+        setOldPassword(''); setNewPassword(''); setConfirmPassword('');
+      } else {
+        const err = await response.json();
+        Alert.alert("Ошибка", err.detail);
+      }
+    } catch (e) { Alert.alert("Ошибка сети"); }
+    finally { setSaving(false); }
+  };
+
+  // 1. Загрузка данных при входе на экран
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+  try {
+    const token = await SecureStore.getItemAsync('userToken');
+    const response = await fetch(`${API_URL}/api/v1/users/me`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (response.ok) {
+      setFirstName(data.first_name);
+      setLastName(data.last_name);
+      setUsername(data.username);
+      setEmail(data.email);
+      // ВАЖНО: Добавляем установку аватара
+      if (data.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    }
+  } catch (e) {
+    console.log("Ошибка загрузки профиля:", e);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  // 2. Логика сохранения изменений
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const response = await fetch(`${API_URL}/api/v1/users/me`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+          username: username,
+          email: email
+        })
+      });
+
+      if (response.ok) {
+        Alert.alert("Успех", "Профиль обновлен");
+      } else {
+        const err = await response.json();
+        Alert.alert("Ошибка", err.detail || "Не удалось обновить");
+      }
+    } catch (e) {
+      Alert.alert("Ошибка сети");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+const handleLogout = async () => {
+  Alert.alert(
+    "Выход",
+    "Вы уверены, что хотите выйти из аккаунта?",
+    [
+      { text: "Отмена", style: "cancel" },
+      {
+        text: "Выйти",
+        style: "destructive",
+        onPress: async () => {
+          // 1. Удаляем токен
+          await SecureStore.deleteItemAsync('userToken');
+
+          // 2. Сбрасываем именно корневой Stack
+          //    оставляем только 'index' (app/index.tsx = Onboarding)
+          rootNavigation?.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'index' }],
+            })
+          );
+        },
+      },
+    ]
+  );
+};
+
+  if (loading) {
+    return (
+      <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
+        <ActivityIndicator size="large" color="#4169E1" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         
-        {/* Хедер */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Настройки профиля</Text>
           <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
@@ -23,76 +289,106 @@ export default function UserProfileScreen() {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           
-          {/* Блок с аватаркой и именем */}
           <View style={styles.topSectionRow}>
             <View style={{ flex: 1, marginRight: 20 }}>
                <Text style={styles.label}>Имя</Text>
-               <TextInput style={styles.input} placeholder="Джон" placeholderTextColor="#A0A0A0" />
+               <TextInput 
+                style={styles.input} 
+                value={firstName} 
+                onChangeText={setFirstName} 
+                placeholder="Имя" 
+              />
                <View style={{ height: 15 }} />
                <Text style={styles.label}>Фамилия</Text>
-               <TextInput style={styles.input} placeholder="Джонсон" placeholderTextColor="#A0A0A0" />
+               <TextInput 
+                style={styles.input} 
+                value={lastName} 
+                onChangeText={setLastName} 
+                placeholder="Фамилия" 
+              />
             </View>
             
-            <View style={styles.avatarSection}>
-               <Text style={[styles.label, { textAlign: 'center' }]}>Картинка профиля</Text>
-               <View style={styles.largeAvatarPlaceholder}>
-                 <Ionicons name="person" size={50} color="#E0E0E0" />
-               </View>
-               <View style={styles.avatarActions}>
-                  <TouchableOpacity style={styles.actionBtnPrimary}><Ionicons name="add" size={20} color="#FFF" /></TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtnSecondary}><Ionicons name="trash-outline" size={18} color="#FFF" /></TouchableOpacity>
-               </View>
+          <View style={styles.avatarSection}>
+            <View style={styles.largeAvatarPlaceholder}>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+              ) : (
+                <Ionicons name="person" size={50} color="#E0E0E0" />
+              )}
+              
+              {/* Кнопка смены (справа) */}
+              <TouchableOpacity style={styles.editBadge} onPress={pickImage} activeOpacity={0.7}>
+                <Ionicons name="camera" size={16} color="#FFF" />
+              </TouchableOpacity>
+
+              {/* Кнопка удаления (слева) */}
+              {avatarUrl && (
+                <TouchableOpacity 
+                  style={[styles.editBadge, { right: undefined, left: 0, backgroundColor: '#E84142' }]} 
+                  onPress={removeImage}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="trash" size={16} color="#FFF" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
-          {/* Псевдоним и Email */}
+          </View>
+
           <View style={styles.rowInputs}>
              <View style={{ flex: 1, marginRight: 10 }}>
                 <Text style={styles.label}>Псевдоним</Text>
-                <TextInput style={styles.input} placeholder="johnjohnson88" placeholderTextColor="#A0A0A0" />
+                <TextInput style={styles.input} value={username} onChangeText={setUsername} />
              </View>
              <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={styles.label}>Email</Text>
-                <TextInput style={styles.input} placeholder="johnjohnson@..." placeholderTextColor="#A0A0A0" />
+                <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" />
              </View>
           </View>
 
           <View style={styles.divider} />
 
-          {/* Смена пароля */}
-          <Text style={styles.sectionTitle}>Сменить пароль</Text>
+        <Text style={styles.sectionTitle}>Сменить пароль</Text>
+        <TextInput 
+          style={styles.input} 
+          placeholder="Старый пароль" 
+          secureTextEntry 
+          value={oldPassword} 
+          onChangeText={setOldPassword} 
+        />
+        <View style={{ height: 10 }} />
+        <TextInput 
+          style={styles.input} 
+          placeholder="Новый пароль" 
+          secureTextEntry 
+          value={newPassword} 
+          onChangeText={setNewPassword} 
+        />
+        <View style={{ height: 10 }} />
+        <TextInput 
+          style={styles.input} 
+          placeholder="Подтвердите пароль" 
+          secureTextEntry 
+          value={confirmPassword} 
+          onChangeText={setConfirmPassword} 
+        />
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Нынешний пароль</Text>
-            <View style={styles.passwordBox}>
-               <TextInput style={{flex: 1}} placeholder="ввести нынешний пароль" secureTextEntry placeholderTextColor="#A0A0A0" />
-               <Ionicons name="eye-outline" size={20} color="#A0A0A0" />
-            </View>
-          </View>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleChangePassword}>
+          <Text style={styles.saveBtnText}>Обновить пароль</Text>
+        </TouchableOpacity>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Новый пароль</Text>
-            <View style={styles.passwordBox}>
-               <TextInput style={{flex: 1}} placeholder="придумать новый пароль" secureTextEntry placeholderTextColor="#A0A0A0" />
-               <Ionicons name="eye-outline" size={20} color="#A0A0A0" />
-            </View>
-          </View>
+        <View style={styles.divider} />
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Подтвердить пароль</Text>
-            <TextInput style={styles.input} placeholder="повторно ввести пароль" secureTextEntry placeholderTextColor="#A0A0A0" />
-          </View>
-
-          {/* Кнопки внизу */}
-          <TouchableOpacity style={styles.saveBtn}>
-            <Text style={styles.saveBtnText}>Сохранить изменения</Text>
+          <TouchableOpacity 
+            style={[styles.saveBtn, saving && { opacity: 0.7 }]} 
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>Сохранить изменения</Text>}
           </TouchableOpacity>
 
-          {/* Кнопка ВЫХОДА (возвращает на главный экран) */}
-          <TouchableOpacity 
-            style={styles.logoutBtn}
-            onPress={() => router.replace('/')} // Переход на экран Onboarding
-          >
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color="#E84142" />
             <Text style={styles.logoutBtnText}>Выйти</Text>
           </TouchableOpacity>
@@ -131,4 +427,17 @@ const styles = StyleSheet.create({
   
   logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 18, borderRadius: 30, borderWidth: 1, borderColor: '#E84142', backgroundColor: '#FFF' },
   logoutBtnText: { color: '#E84142', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#4169E1',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF'
+  }
 });

@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useState, useEffect} from 'react';
 import {
     View,
     Text,
@@ -14,10 +14,14 @@ import {
     Keyboard,
 } from 'react-native';
 import {Ionicons, Feather} from '@expo/vector-icons';
-import {useRouter, useNavigation} from 'expo-router';
+import { useRouter, useNavigation} from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import {DrawerActions} from '@react-navigation/native';
 import {Image} from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 // Компонент Канбан-кнопки с раскрывающимся списком
 const KanbanButton = ({count, title, color, isExpanded, onToggle}: any) => (
@@ -58,12 +62,42 @@ export default function ProjectWorkspaceScreen() {
 
     const defaultProjectImage = require('../../assets/images/tracklane-logo-circle.svg');
 
+    const { projectId, myRole } = useLocalSearchParams<{ projectId: string; myRole: string }>();
+
     const [project, setProject] = useState({
-        title: 'Проект Аврора',
-        description: 'Основной проект команды по разработке интерфейсов и задач.',
+        title: '',
+        description: '',
         imageUri: '',
         accent: '#4169E1',
+        owner_id: 0,
     });
+
+    // Загрузка данных проекта при входе
+    useEffect(() => {
+        if (projectId) fetchProject();
+    }, [projectId]);
+
+    const fetchProject = async () => {
+        try {
+            const token = await SecureStore.getItemAsync('userToken');
+            const res = await fetch(`${API_URL}/api/v1/projects`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                const found = data.find((p: any) => p.id === Number(projectId));
+                if (found) {
+                    setProject({
+                        title: found.title,
+                        description: found.description || '',
+                        imageUri: found.image_url || '',
+                        accent: '#4169E1',
+                        owner_id: found.owner_id,
+                    });
+                }
+            }
+        } catch (e) { console.error(e); }
+    };
 
     const [draftProject, setDraftProject] = useState({
         title: project.title,
@@ -155,12 +189,18 @@ export default function ProjectWorkspaceScreen() {
                     </View>
 
                     {/* Участники */}
-                    <View style={styles.sectionRow}>
-                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                            <Text style={styles.sectionTitle}>Участники</Text>
-                            <Ionicons name="people-circle" size={16} color={project.accent} style={{marginLeft: 5}}/>
-                        </View>
-                    </View>
+                    {myRole === 'admin' && (
+                        <TouchableOpacity
+                            style={styles.manageTeamBtn}
+                            onPress={() => router.push({
+                                pathname: '/team',
+                                params: { projectId, myRole }
+                            })}
+                        >
+                            <Ionicons name="settings-outline" size={14} color="#4169E1" />
+                            <Text style={styles.manageTeamBtnText}>Управление</Text>
+                        </TouchableOpacity>
+                    )}
 
                     <View style={styles.avatarsContainer}>
                         <Image source={{uri: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=100&q=80'}}
@@ -588,4 +628,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#E84142',
     },
+
+    manageTeamBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+    manageTeamBtnText: { fontSize: 12, color: '#4169E1', fontWeight: '600' },
 });

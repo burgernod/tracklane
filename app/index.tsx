@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,9 +8,11 @@ import {
     Platform,
     Dimensions,
     Animated,
+    ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
+import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
 
@@ -38,6 +40,39 @@ const slides = [
 export default function OnboardingScreen() {
     const router = useRouter();
     const scrollX = useRef(new Animated.Value(0)).current;
+    const [isChecking, setIsChecking] = useState(true); 
+
+    useEffect(() => {
+        checkAuth();
+    }, []);
+
+    const checkAuth = async () => {
+        try {
+            const token = await SecureStore.getItemAsync('userToken');
+            
+            // Усиленная проверка: убеждаемся, что токен реально существует
+            // и не является строковым мусором
+            if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+                router.replace('/(drawer)');
+            } else {
+                // Очищаем мусор, если он там есть
+                await SecureStore.deleteItemAsync('userToken');
+                setIsChecking(false);
+            }
+        } catch (e) {
+            console.error("Ошибка при чтении токена:", e);
+            setIsChecking(false);
+        }
+    };
+
+    // Если идет проверка — показываем пустой экран или экран загрузки
+    if (isChecking) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#1E1F24', justifyContent: 'center' }}>
+                <ActivityIndicator color="#4169E1" size="large" />
+            </View>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
