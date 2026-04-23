@@ -62,7 +62,7 @@ uvicorn main:app --reload
 
 ```bash
 # 1. Фронтенд репозиторийін клондау және папкаға өту
-git clone https://github.com/burgernod/tracklane.git
+git clone https://github.com/burgernod/tracklane
 cd tracklane
 
 # 2. Node модульдерін орнату
